@@ -149,3 +149,13 @@ export PORTKEY_VIRTUAL_KEY=...
 - `anthropic`, `openai`, `google-genai`, `pillow`, `tenacity`, `portkey-ai`
 
 TIFF images are automatically converted to JPEG before sending to the API.
+
+---
+
+## License
+
+MIT License — see [LICENSE](LICENSE) for details.
+
+---
+
+*Built with assistance of Claude (Anthropic).*
