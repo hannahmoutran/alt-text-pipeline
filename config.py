@@ -1,0 +1,202 @@
+# config.py
+"""
+Configuration for the alt-text-pipeline.
+Edit this file to set your provider, model, and image folder preferences.
+"""
+
+# =============================================================================
+# IMAGE FOLDER CONFIGURATION
+# =============================================================================
+# Option 1: Process a SINGLE folder (path relative to project root)
+IMAGE_FOLDER = "images/junge"
+
+# Option 2: Process MULTIPLE folders sequentially
+# When set (not None/empty), takes precedence over IMAGE_FOLDER
+IMAGE_FOLDERS = None  # e.g., ["images/small", "images/medium", "images/large"]
+
+# =============================================================================
+# MODEL CONFIGURATION
+# =============================================================================
+# Provider options: "claude", "openai", "gemini"
+STEP1_PROVIDER = "gemini"
+
+# Set a specific model, or None to use the provider's default
+STEP1_MODEL = None
+
+# =============================================================================
+# AVAILABLE MODELS BY PROVIDER
+# =============================================================================
+AVAILABLE_MODELS = {
+    # -------------------------------------------------------------------------
+    # ANTHROPIC CLAUDE MODELS
+    # -------------------------------------------------------------------------
+    "claude": {
+        "default": "claude-sonnet-4-5-20250929",
+        "models": [
+            # Opus - Most capable
+            "claude-opus-4-5-20250514",
+            "claude-opus-4-1-20250414",
+            "claude-opus-4-20250514",
+            # Sonnet - Balanced performance/cost
+            "claude-sonnet-4-5-20250929",
+            "claude-sonnet-4-5-20250514",
+            "claude-sonnet-4-20250514",
+            # Haiku - Fast and affordable
+            "claude-haiku-4-5-20250514",
+            "claude-3-5-haiku-20241022",
+            "claude-3-haiku-20240307",
+        ]
+    },
+
+    # -------------------------------------------------------------------------
+    # OPENAI MODELS
+    # -------------------------------------------------------------------------
+    "openai": {
+        "default": "gpt-5.1",
+        "models": [
+            # GPT-5 Series
+            "gpt-5.2",
+            "gpt-5.1",
+            "gpt-5",
+            "gpt-5-mini",
+            "gpt-5-nano",
+            # GPT-5 Pro (reasoning)
+            "gpt-5.2-pro",
+            "gpt-5-pro",
+            # GPT-4.1 Series
+            "gpt-4.1",
+            "gpt-4.1-mini",
+            "gpt-4.1-nano",
+            # GPT-4o Series
+            "gpt-4o",
+            "gpt-4o-mini",
+            # O-Series (reasoning)
+            "o1",
+            "o1-mini",
+            "o3",
+            "o3-mini",
+            "o4-mini",
+        ]
+    },
+
+    # -------------------------------------------------------------------------
+    # GOOGLE GEMINI MODELS
+    # -------------------------------------------------------------------------
+    "gemini": {
+        "default": "gemini-3-flash-preview",
+        "models": [
+            "gemini-3-pro-preview",
+            "gemini-3-flash-preview",
+            "gemini-3-pro-image-preview",
+        ]
+    }
+}
+
+# =============================================================================
+# PIPELINE STEPS
+# =============================================================================
+# Set True to automatically run Step 2 (HTML Review) after each folder.
+RUN_HTML_REVIEW = True
+
+# =============================================================================
+# BATCHING CONFIGURATION
+# =============================================================================
+# Number of images to send in a single API call.
+# 1 = one image per call (default)
+# 2-4 = send multiple images together (e.g. front/back of a document)
+# All three providers (Claude, OpenAI, Gemini) support multiple images per call.
+IMAGES_PER_CALL = 2
+
+# =============================================================================
+# GROUNDING CONFIGURATION
+# =============================================================================
+# Number of images processed by step-0-grounding.py to create the grounding set.
+# After review and editing, these become few-shot examples for the full run.
+GROUNDING_COUNT = 2
+
+# =============================================================================
+# PORTKEY GATEWAY CONFIGURATION
+# =============================================================================
+# Set True to route API calls through Portkey (requires PORTKEY_API_KEY
+# and PORTKEY_VIRTUAL_KEY environment variables).
+USE_PORTKEY = False
+
+# =============================================================================
+# STEP 1 PROMPT
+# =============================================================================
+# {collection_context} is replaced at runtime with the contents of
+# collection-context.txt found in the image folder, or an empty string if
+# no such file exists.
+STEP1_PROMPT = """\
+Analyze this image and generate accurate alt text for accessibility purposes.
+{collection_context}
+{collection_examples}
+Respond in this exact format with no additional text before or after:
+
+Alt Text: [one plain sentence for a screen reader — state what the image shows without saying "image of". Include relevant details including date, title (in original language), author if visible. Do not mention materials used to create an object unless explicitly noted in the image.]
+
+"""
+
+
+# =============================================================================
+# HELPER FUNCTIONS
+# =============================================================================
+
+def get_image_folders():
+    if IMAGE_FOLDERS:
+        return IMAGE_FOLDERS
+    return [IMAGE_FOLDER]
+
+
+def get_step1_config(image_folder=None):
+    provider = STEP1_PROVIDER.lower()
+    if provider not in AVAILABLE_MODELS:
+        raise ValueError(f"Unknown provider: {provider}. Choose from: {list(AVAILABLE_MODELS.keys())}")
+    model = STEP1_MODEL if STEP1_MODEL else AVAILABLE_MODELS[provider]["default"]
+    folder = image_folder if image_folder else IMAGE_FOLDER
+    return {
+        "provider": provider,
+        "model": model,
+        "image_folder": folder,
+        "use_portkey": USE_PORTKEY,
+        "images_per_call": IMAGES_PER_CALL,
+    }
+
+
+def print_current_config():
+    print("\n" + "=" * 55)
+    print("CURRENT CONFIGURATION")
+    print("=" * 55)
+    folders = get_image_folders()
+    if len(folders) == 1:
+        print(f"Image Folder : {folders[0]}")
+    else:
+        print(f"Image Folders ({len(folders)}):")
+        for f in folders:
+            print(f"  - {f}")
+    step1 = get_step1_config()
+    print(f"\nStep 1 — Image Analysis:")
+    print(f"  Provider : {step1['provider'].upper()}")
+    print(f"  Model    : {step1['model']}")
+    print(f"  Batch    : {step1['images_per_call']} image(s) per call")
+    if step1["use_portkey"]:
+        print(f"  Gateway  : Portkey")
+    print(f"\nStep 2 — HTML Review : {'enabled' if RUN_HTML_REVIEW else 'disabled'}")
+    print(f"Grounding sample     : {GROUNDING_COUNT} images (run step-0-grounding.py)")
+    print("=" * 55 + "\n")
+
+
+def list_available_models(provider=None):
+    targets = {provider.lower(): AVAILABLE_MODELS[provider.lower()]} if provider else AVAILABLE_MODELS
+    for prov, cfg in targets.items():
+        print(f"\n{prov.upper()} Models:")
+        print(f"  Default: {cfg['default']}")
+        print("  Available:")
+        for m in cfg["models"]:
+            print(f"    - {m}")
+
+
+if __name__ == "__main__":
+    print_current_config()
+    print("AVAILABLE MODELS:")
+    list_available_models()

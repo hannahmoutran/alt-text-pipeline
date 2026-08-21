@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+myenv/
+
+# Type checking
+.mypy_cache/
+.pyre/
+
+# macOS
+.DS_Store
+**/.DS_Store
+._*
+
+# Project-specific
+examples
+images
+output_folders
+
+# Output files (keep code, ignore generated data)
+*.xlsx
+*.log
+~$*.xlsx
+
+# Large files
+get-pip.py

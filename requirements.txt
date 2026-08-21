@@ -1,0 +1,6 @@
+anthropic
+openai
+google-genai
+portkey-ai
+pillow
+tenacity

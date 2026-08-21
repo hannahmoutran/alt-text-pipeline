@@ -1,0 +1,14 @@
+[project]
+name = "alt-text"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=0.111.0",
+    "google-genai>=2.9.0",
+    "openai>=2.43.0",
+    "pillow>=12.2.0",
+    "portkey-ai>=2.3.2",
+    "tenacity>=9.1.4",
+]
