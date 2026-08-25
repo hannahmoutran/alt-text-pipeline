@@ -14,7 +14,7 @@ Generates alt text for all images in the collection. If grounding examples and s
 Generates a browser-based review interface. Each image can be viewed at full size, text can be edited, and internal archivist notes can be added. Export decisions as JSON when done.
 
 **Integrate Edits** (`integrate_edits.py`)
-Applies reviewer decisions back into the results JSON when used on a full run. Use `--export-grounding` to process grounding decisions and write `collection-examples.txt` to the image folder — this includes both the few-shot examples and the AI-generated style guide. Both can be reviewed and edited before running step 1.
+Applies reviewer decisions back into the results JSON when used on a full run. To process grounding decisions and write `collection-examples.txt` to the image folder, use `step-0-grounding.py --export` — this includes both the few-shot examples and the AI-generated style guide. Both can be reviewed and edited before running step 1.
 
 ---
 
@@ -66,7 +66,7 @@ python step-2-html-review.py
 # In browser: review, edit, export decisions JSON → move to review/exports/
 
 # Integrate edits and write grounding examples
-python integrate_edits.py --export-grounding
+python step-0-grounding.py --export
 
 # Step 1: full run with style-guided examples
 python run.py
@@ -78,6 +78,22 @@ python run.py
 python run.py
 ```
 
+**Optional: verify the style guide before the full run**
+
+```bash
+# After step-0-grounding.py --export, test the style guide on a few fresh images
+python step-0-grounding.py --test
+# Review the output, edit collection-examples.txt if needed, then re-test or run.py
+```
+
+---
+
+## Grounding and the full run
+
+By default (`SKIP_GROUNDING_IMAGES = 2` in `config.py`), the full run skips the first N images in the folder and only processes the rest. Skipped images are not included in the output — they have already been reviewed and live in the grounding output folder. Increase the count if you have also done test runs whose images you want to exclude (e.g. `SKIP_GROUNDING_IMAGES = 4` to skip 2 grounding + 2 test images).
+
+Set `SKIP_GROUNDING_IMAGES = 0` to process every image in the folder.
+
 ---
 
 ## Collection context and examples
@@ -86,7 +102,7 @@ Place these optional files in your image folder to guide the AI:
 
 **`collection-context.txt`** — a brief description of the collection (provenance, date range, subject matter). Included in every prompt.
 
-**`collection-examples.txt`** — few-shot examples showing original AI output alongside archivist corrections. Generated automatically by `integrate_edits.py --export-grounding`, or written by hand. Format:
+**`collection-examples.txt`** — few-shot examples showing original AI output alongside archivist corrections. Generated automatically by `step-0-grounding.py --export`, or written by hand. Format:
 
 ```
 Image: filename.jpg
@@ -99,6 +115,8 @@ Alt Text: archivist's corrected version here
 ## Batching
 
 Set `IMAGES_PER_CALL` in [config.py](config.py) to send multiple images per API call — useful for documents with a front and back, or when images naturally pair together. All three providers support multi-image calls.
+
+Set `RELATIONSHIP_BETWEEN_IMAGES_PER_CALL` to a short sentence describing how images in each batch relate to one another (e.g. `"These two images are front and back of the same sketch."`). Leave it empty if the images in a batch are unrelated.
 
 ---
 

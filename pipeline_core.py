@@ -76,8 +76,10 @@ def load_collection_context(folder_path):
         logging.info(f"Loaded collection context from: {context_file}")
         context_text = "\n".join(lines)
         return (
-            f"This image is from the following collection:\n{context_text}\n\n"
-            "Use this context to inform your alt text where relevant."
+            f"[Collection Context]\n"
+            f"The following background applies to the entire collection. "
+            f"Use it to inform your alt text where relevant.\n"
+            f"{context_text}"
         )
     except Exception as e:
         logging.warning(f"Could not read collection context: {e}")
@@ -149,11 +151,17 @@ def parse_response(raw_response):
     return result, None
 
 
-def build_batch_prompt(base_prompt, n_images):
+def build_batch_prompt(base_prompt, n_images, relationship=""):
     """Adapt prompt for n_images > 1."""
     if n_images == 1:
         return base_prompt
     prompt = base_prompt.replace("this image", f"each of these {n_images} images", 1)
+    if relationship:
+        first_newline = prompt.find("\n")
+        if first_newline != -1:
+            prompt = prompt[:first_newline + 1] + relationship + "\n" + prompt[first_newline + 1:]
+        else:
+            prompt = prompt + "\n" + relationship
     marker = "Respond in this exact format with no additional text before or after:"
     idx = prompt.find(marker)
     if idx != -1:
@@ -210,10 +218,22 @@ def init_client(provider, use_portkey=False):
 # PROVIDER-SPECIFIC API CALLS
 # =============================================================================
 
+def _is_transient_error(exc):
+    """Retry only on transient failures — rate limits (429), server errors (5xx),
+    timeouts, and dropped connections. Auth errors, invalid requests, and
+    unknown-model errors fail fast with the provider's real message instead of
+    being retried and buried in a RetryError."""
+    status = getattr(exc, "status_code", None)
+    if isinstance(status, int):
+        return status == 429 or status >= 500
+    name = type(exc).__name__.lower()
+    return any(k in name for k in ("timeout", "connection", "overloaded"))
+
+
 @tenacity.retry(
     wait=tenacity.wait_exponential(multiplier=1, min=4, max=10),
     stop=tenacity.stop_after_attempt(3),
-    retry=tenacity.retry_if_exception_type(Exception)
+    retry=tenacity.retry_if_exception(_is_transient_error)
 )
 def _call_claude(client, image_paths, model_name, prompt):
     content = []
@@ -235,7 +255,7 @@ def _call_claude(client, image_paths, model_name, prompt):
 @tenacity.retry(
     wait=tenacity.wait_exponential(multiplier=1, min=4, max=10),
     stop=tenacity.stop_after_attempt(3),
-    retry=tenacity.retry_if_exception_type(Exception)
+    retry=tenacity.retry_if_exception(_is_transient_error)
 )
 def _call_openai(client, image_paths, model_name, prompt):
     content = [{"type": "text", "text": prompt}]
@@ -246,8 +266,7 @@ def _call_openai(client, image_paths, model_name, prompt):
     response = client.chat.completions.create(
         model=model_name,
         messages=[{"role": "user", "content": content}],
-        max_tokens=1500 * len(image_paths),
-        temperature=0.3
+        max_completion_tokens=1500 * len(image_paths),
     )
     raw = response.choices[0].message.content.strip()
     usage = {"input_tokens": response.usage.prompt_tokens, "output_tokens": response.usage.completion_tokens}
@@ -257,7 +276,7 @@ def _call_openai(client, image_paths, model_name, prompt):
 @tenacity.retry(
     wait=tenacity.wait_exponential(multiplier=1, min=4, max=10),
     stop=tenacity.stop_after_attempt(3),
-    retry=tenacity.retry_if_exception_type(Exception)
+    retry=tenacity.retry_if_exception(_is_transient_error)
 )
 def _call_gemini(client, image_paths, model_name, prompt):
     from google.genai import types
@@ -278,11 +297,11 @@ def _call_gemini(client, image_paths, model_name, prompt):
     return raw, usage
 
 
-def process_image(provider, client, image_paths, model_name, prompt):
+def process_image(provider, client, image_paths, model_name, prompt, relationship=""):
     """Dispatch to the correct provider. Returns (parsed_list, raw, usage, time)."""
     start = time.time()
     n = len(image_paths)
-    batch_prompt = build_batch_prompt(prompt, n)
+    batch_prompt = build_batch_prompt(prompt, n, relationship)
 
     if provider == 'claude':
         raw, usage = _call_claude(client, image_paths, model_name, batch_prompt)
@@ -345,7 +364,7 @@ def format_examples_for_prompt(examples, style_analysis=""):
     """Format examples as a prompt block, optionally preceded by the style analysis."""
     if not examples:
         return ""
-    lines = []
+    lines = ["[Examples]"]
     if style_analysis:
         lines.append(style_analysis)
         lines.append("\nGrounding examples that informed this style guide:\n")
@@ -385,8 +404,7 @@ def generate_style_analysis(examples, provider, client, model_name):
             response = client.chat.completions.create(
                 model=model_name,
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=2000,
-                temperature=0.3
+                max_completion_tokens=2000,
             )
             return response.choices[0].message.content.strip()
         elif provider == 'gemini':
@@ -437,7 +455,7 @@ def collect_all_images(input_folder):
 # BATCH PROCESSING
 # =============================================================================
 
-def process_image_list(images, prompt, provider, client, model_name, images_per_call, display_total, display_offset=0):
+def process_image_list(images, prompt, provider, client, model_name, images_per_call, display_total, display_offset=0, relationship=""):
     """Process a list of (folder_label, img_path) tuples. Returns (results, issues, input_tokens, output_tokens)."""
     results = []
     issues = []
@@ -457,7 +475,7 @@ def process_image_list(images, prompt, provider, client, model_name, images_per_
             print(f"[{disp_start}-{disp_end}/{display_total}] {', '.join(filenames)}")
 
         try:
-            parsed_list, raw, usage, proc_time = process_image(provider, client, img_paths, model_name, prompt)
+            parsed_list, raw, usage, proc_time = process_image(provider, client, img_paths, model_name, prompt, relationship)
             total_input_tokens += usage.get('input_tokens', 0)
             total_output_tokens += usage.get('output_tokens', 0)
             tokens = usage.get('input_tokens', 0) + usage.get('output_tokens', 0)

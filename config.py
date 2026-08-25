@@ -18,7 +18,7 @@ IMAGE_FOLDERS = None  # e.g., ["images/small", "images/medium", "images/large"]
 # MODEL CONFIGURATION
 # =============================================================================
 # Provider options: "claude", "openai", "gemini"
-STEP1_PROVIDER = "gemini"
+STEP1_PROVIDER = "openai"
 
 # Set a specific model, or None to use the provider's default
 STEP1_MODEL = None
@@ -31,20 +31,13 @@ AVAILABLE_MODELS = {
     # ANTHROPIC CLAUDE MODELS
     # -------------------------------------------------------------------------
     "claude": {
-        "default": "claude-sonnet-4-5-20250929",
+        "default": "claude-sonnet-4-6",
         "models": [
-            # Opus - Most capable
-            "claude-opus-4-5-20250514",
-            "claude-opus-4-1-20250414",
-            "claude-opus-4-20250514",
-            # Sonnet - Balanced performance/cost
-            "claude-sonnet-4-5-20250929",
-            "claude-sonnet-4-5-20250514",
-            "claude-sonnet-4-20250514",
-            # Haiku - Fast and affordable
-            "claude-haiku-4-5-20250514",
-            "claude-3-5-haiku-20241022",
-            "claude-3-haiku-20240307",
+            "claude-opus-4-8",
+            "claude-opus-4-7",
+            "claude-opus-4-6",
+            "claude-sonnet-4-6",
+            "claude-haiku-4-5",
         ]
     },
 
@@ -52,30 +45,21 @@ AVAILABLE_MODELS = {
     # OPENAI MODELS
     # -------------------------------------------------------------------------
     "openai": {
-        "default": "gpt-5.1",
+        "default": "gpt-5.6-luna",
         "models": [
-            # GPT-5 Series
-            "gpt-5.2",
-            "gpt-5.1",
-            "gpt-5",
-            "gpt-5-mini",
-            "gpt-5-nano",
-            # GPT-5 Pro (reasoning)
-            "gpt-5.2-pro",
-            "gpt-5-pro",
-            # GPT-4.1 Series
-            "gpt-4.1",
+            "gpt-5.6-sol",           
+            "gpt-5.6-terra",     
+            "gpt-5.6-luna",      
+            "gpt-5.5-pro",
+            "gpt-5.5",           
+            "gpt-5.4",
+            "gpt-5.4-pro",
+            "gpt-5.4-mini",
+            "gpt-5.4-nano",
+            "gpt-4.1",           
             "gpt-4.1-mini",
-            "gpt-4.1-nano",
-            # GPT-4o Series
-            "gpt-4o",
-            "gpt-4o-mini",
-            # O-Series (reasoning)
-            "o1",
-            "o1-mini",
-            "o3",
-            "o3-mini",
-            "o4-mini",
+            "gpt-4o",            
+            "gpt-4o-mini",          
         ]
     },
 
@@ -83,11 +67,16 @@ AVAILABLE_MODELS = {
     # GOOGLE GEMINI MODELS
     # -------------------------------------------------------------------------
     "gemini": {
-        "default": "gemini-3-flash-preview",
+        "default": "gemini-3.5-flash-lite",
         "models": [
-            "gemini-3-pro-preview",
+            "gemini-3.7-flash",
+            "gemini-3.6-flash",
+            "gemini-3.5-flash",
+            "gemini-3.5-flash-lite",
+            "gemini-3.1-flash-lite",
             "gemini-3-flash-preview",
-            "gemini-3-pro-image-preview",
+            "gemini-2.5-flash",
+            "gemini-2.5-flash-lite",
         ]
     }
 }
@@ -99,13 +88,17 @@ AVAILABLE_MODELS = {
 RUN_HTML_REVIEW = True
 
 # =============================================================================
-# BATCHING CONFIGURATION
+# IMAGES PER CALL
 # =============================================================================
-# Number of images to send in a single API call.
-# 1 = one image per call (default)
-# 2-4 = send multiple images together (e.g. front/back of a document)
-# All three providers (Claude, OpenAI, Gemini) support multiple images per call.
+# Number of images to send in a single API call (i.e. message).
+# Claude, OpenAI, and Gemini all support multiple images per call.
 IMAGES_PER_CALL = 2
+
+# When IMAGES_PER_CALL > 1, this sentence is added to the prompt so the AI
+# knows how the images in each batch relate to one another.
+# Leave empty ("") if the images in a batch are unrelated.
+# Example: "These two images are front and back of the same sketch."
+RELATIONSHIP_BETWEEN_IMAGES_PER_CALL = "These two images are front and back of the same sketch."
 
 # =============================================================================
 # GROUNDING CONFIGURATION
@@ -114,12 +107,28 @@ IMAGES_PER_CALL = 2
 # After review and editing, these become few-shot examples for the full run.
 GROUNDING_COUNT = 2
 
+# Number of images used in grounding test mode (step-0-grounding.py --test).
+# Run this after grounding is complete and collection-examples.txt has been created
+# to verify the style guide before a full run.
+GROUNDING_TEST_COUNT = 2
+
+# When True, test mode skips the first GROUNDING_COUNT images (the ones already
+# used to create the examples) and tests on fresh images from the collection.
+GROUNDING_TEST_SKIP_GROUNDING = True
+
+# Number of images to skip at the start of the full run (run.py).
+# Skipped images are not re-processed; those in collection-examples.txt carry
+# their archivist-reviewed alt text forward. Increase this count if you have
+# done test runs whose images you also want to exclude from the full run.
+# Set to 0 to re-process every image.
+SKIP_GROUNDING_IMAGES = 4
+
 # =============================================================================
 # PORTKEY GATEWAY CONFIGURATION
 # =============================================================================
 # Set True to route API calls through Portkey (requires PORTKEY_API_KEY
 # and PORTKEY_VIRTUAL_KEY environment variables).
-USE_PORTKEY = False
+USE_PORTKEY = True
 
 # =============================================================================
 # STEP 1 PROMPT
@@ -128,7 +137,7 @@ USE_PORTKEY = False
 # collection-context.txt found in the image folder, or an empty string if
 # no such file exists.
 STEP1_PROMPT = """\
-Analyze this image and generate accurate alt text for accessibility purposes.
+Analyze this image and generate accurate alt text for accessibility purposes. 
 {collection_context}
 {collection_examples}
 Respond in this exact format with no additional text before or after:
@@ -183,6 +192,8 @@ def print_current_config():
         print(f"  Gateway  : Portkey")
     print(f"\nStep 2 — HTML Review : {'enabled' if RUN_HTML_REVIEW else 'disabled'}")
     print(f"Grounding sample     : {GROUNDING_COUNT} images (run step-0-grounding.py)")
+    skip_label = f"skip first {SKIP_GROUNDING_IMAGES} image(s)" if SKIP_GROUNDING_IMAGES else "re-process all images"
+    print(f"Full run             : {skip_label}")
     print("=" * 55 + "\n")
 
 

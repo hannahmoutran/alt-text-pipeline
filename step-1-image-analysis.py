@@ -26,7 +26,7 @@ from datetime import datetime
 script_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, script_dir)
 
-from config import get_step1_config, STEP1_PROMPT
+from config import get_step1_config, STEP1_PROMPT, SKIP_GROUNDING_IMAGES, RELATIONSHIP_BETWEEN_IMAGES_PER_CALL
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 for lib in ("anthropic", "openai", "google", "urllib3", "httpx", "portkey_ai"):
@@ -85,7 +85,13 @@ def main():
         else:
             print("Style analysis unavailable — proceeding with examples only.")
     elif style_analysis:
-        print(f"\nLoaded style guide from collection-style-guide.txt")
+        print(f"\nLoaded style guide from collection-examples.txt")
+
+    skip_count = SKIP_GROUNDING_IMAGES if SKIP_GROUNDING_IMAGES else 0
+    images_to_process = all_images[skip_count:]
+    skipped_count = skip_count
+    if skipped_count:
+        print(f"Skipping first {skipped_count} image(s) — using archivist alt text from collection-examples.txt where available")
 
     collection_examples = format_examples_for_prompt(examples, style_analysis)
     prompt = STEP1_PROMPT.format(
@@ -101,24 +107,30 @@ def main():
     os.makedirs(os.path.join(output_dir, "metadata", "json"), exist_ok=True)
 
     script_start = time.time()
-    all_results, issues, total_input_tokens, total_output_tokens = process_image_list(
-        all_images, prompt, provider, client, model_name, images_per_call, total, 0
+    fresh_results, issues, total_input_tokens, total_output_tokens = process_image_list(
+        images_to_process, prompt, provider, client, model_name, images_per_call,
+        len(images_to_process), 0,
+        relationship=RELATIONSHIP_BETWEEN_IMAGES_PER_CALL,
     )
     total_time = time.time() - script_start
+
+    all_results = fresh_results
 
     summary = {
         "provider": provider,
         "model": model_name,
         "use_portkey": use_portkey,
         "image_folder": input_folder_name,
-        "total_images": total,
-        "successful": total - len(issues),
+        "total_images": len(images_to_process),
+        "successful": len(images_to_process) - len(issues),
         "failed": len(issues),
         "total_input_tokens": total_input_tokens,
         "total_output_tokens": total_output_tokens,
         "total_tokens": total_input_tokens + total_output_tokens,
         "total_time_seconds": round(total_time, 2),
     }
+    if skipped_count:
+        summary["skipped_from_start"] = skipped_count
     if issues:
         summary["issues"] = issues
     if examples:
@@ -132,7 +144,8 @@ def main():
         json.dump(output, f, indent=2, ensure_ascii=False)
 
     print(f"\nSTEP 1 COMPLETE")
-    print(f"Processed : {total - len(issues)}/{total} images")
+    processed = len(images_to_process)
+    print(f"Processed : {processed - len(issues)}/{processed} images")
     if issues:
         print(f"Failed    : {len(issues)}")
     print(f"Tokens    : {total_input_tokens + total_output_tokens:,}  (in: {total_input_tokens:,}, out: {total_output_tokens:,})")

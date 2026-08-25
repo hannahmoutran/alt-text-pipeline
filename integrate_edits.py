@@ -3,7 +3,7 @@
 Alt Text — Integrate Reviewer Edits
 =====================================
 
-Reads reviewer decisions exported from html_review.py and applies them back
+Reads reviewer decisions exported from step-2-html-review.py and applies them back
 into alt_text_results.json.
 
 What this script does:
@@ -33,18 +33,6 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 # ---------------------------------------------------------------------------
 # Folder / export discovery
 # ---------------------------------------------------------------------------
-
-def find_newest_output_folder(base_dir):
-    """Return the path to the most recently modified AltText_ folder."""
-    if not os.path.exists(base_dir):
-        return None
-    folders = [
-        os.path.join(base_dir, d)
-        for d in os.listdir(base_dir)
-        if d.startswith("AltText_") and os.path.isdir(os.path.join(base_dir, d))
-    ]
-    return max(folders, key=os.path.getmtime) if folders else None
-
 
 def list_output_folders(base_dir):
     if not os.path.exists(base_dir):
@@ -489,7 +477,7 @@ class AltTextEditsIntegrator:
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Apply reviewer edits from html_review.py back into alt_text_results.json.'
+        description='Apply reviewer edits from step-2-html-review.py back into alt_text_results.json.'
     )
     parser.add_argument('--folder', '-f', help='Path to AltText_ output folder.')
     parser.add_argument('--decisions', '-d', help='Path to specific decisions JSON file.')

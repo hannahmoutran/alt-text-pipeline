@@ -34,7 +34,7 @@ def find_newest_output_folder():
 
 
 def run_html_review(folder_path=None):
-    """Run html_review.py for the given output folder (or newest if not specified)."""
+    """Run step-2-html-review.py for the given output folder (or newest if not specified)."""
     if folder_path is None:
         folder_path = find_newest_output_folder()
         if not folder_path:

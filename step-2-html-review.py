@@ -10,9 +10,9 @@ allows editing or approving.
 After running step-1-image-analysis.py, run this to review results:
 
 Usage:
-    python html_review.py
-    python html_review.py --folder output_folders/AltText_...
-    python html_review.py --records-per-page 10
+    python step-2-html-review.py
+    python step-2-html-review.py --folder output_folders/AltText_...
+    python step-2-html-review.py --records-per-page 10
 
 Then open the generated HTML file in your browser.
 Export your decisions and pass them to integrate_edits.py.
