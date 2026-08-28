@@ -19,7 +19,7 @@ FIELD_MAPPING = {
 }
 
 STYLE_ANALYSIS_PROMPT = """\
-Below are grounding examples from this archival collection. Each shows the original \
+Below are calibration examples from this archival collection. Each shows the original \
 AI-generated alt text alongside the archivist's correction.
 
 {examples_text}
@@ -193,13 +193,24 @@ def parse_batch_response(raw_response, n_images):
 # API CLIENTS
 # =============================================================================
 
+# Providers that actually route through Portkey when USE_PORTKEY is set.
+# Claude and Gemini always call their native SDKs directly, so USE_PORTKEY
+# has no effect for them.
+PORTKEY_SUPPORTED_PROVIDERS = {'openai'}
+
+
+def portkey_active(provider, use_portkey):
+    """True only when calls for this provider actually route through Portkey."""
+    return bool(use_portkey) and provider in PORTKEY_SUPPORTED_PROVIDERS
+
+
 def init_client(provider, use_portkey=False):
     if provider == 'claude':
         import anthropic
         api_key = os.getenv('CLAUDE_API_KEY') or os.getenv('ANTHROPIC_API_KEY')
         return anthropic.Anthropic(api_key=api_key)
     elif provider == 'openai':
-        if use_portkey:
+        if portkey_active(provider, use_portkey):
             from portkey_ai import Portkey
             return Portkey(
                 api_key=os.getenv('PORTKEY_API_KEY'),
@@ -328,7 +339,7 @@ def process_image(provider, client, image_paths, model_name, prompt, relationshi
 
 
 # =============================================================================
-# GROUNDING EXAMPLES
+# CALIBRATION EXAMPLES
 # =============================================================================
 
 def read_examples_file(folder_path):
@@ -350,8 +361,8 @@ def read_examples_file(folder_path):
                     current = {'filename': line[6:].strip(), 'original': '', 'alt_text': ''}
                 elif line.lower().startswith('original:') and current is not None:
                     current['original'] = line[9:].strip()
-                elif line.lower().startswith('alt text:') and current is not None:
-                    current['alt_text'] = line[9:].strip()
+                elif line.lower().startswith('archivist correction:') and current is not None:
+                    current['alt_text'] = line[len('archivist correction:'):].strip()
         if current and current.get('alt_text'):
             examples.append(current)
         return examples
@@ -365,15 +376,25 @@ def format_examples_for_prompt(examples, style_analysis=""):
     if not examples:
         return ""
     lines = ["[Examples]"]
+    guidance = (
+        "IMPORTANT: These examples are a guide to STYLE, tone, and level of detail — "
+        "not to specific content. The image you are describing is different from the "
+        "examples. Specific details (colors, numbers, text, titles, dates, placement, "
+        "subject matter) will differ, and may be absent entirely. Describe what you "
+        "observe in the current image. Do not copy or assume details from the "
+        "examples.\n"
+    )
     if style_analysis:
         lines.append(style_analysis)
-        lines.append("\nGrounding examples that informed this style guide:\n")
+        lines.append("\n" + guidance)
+        lines.append("Calibration examples that informed this style guide:\n")
     else:
         lines.append(
             "Here are examples from this collection showing the AI-generated alt text "
             "and the archivist's corrections. Study the differences to understand the "
             "required style and level of detail.\n"
         )
+        lines.append(guidance)
     for ex in examples:
         lines.append(f"Image: {ex['filename']}")
         lines.append(f"AI generated: {ex['original']}")
@@ -382,7 +403,7 @@ def format_examples_for_prompt(examples, style_analysis=""):
 
 
 def generate_style_analysis(examples, provider, client, model_name):
-    """Call the AI with grounding examples and return a style guide string."""
+    """Call the AI with calibration examples and return a style guide string."""
     if not examples:
         return ""
     ex_lines = []

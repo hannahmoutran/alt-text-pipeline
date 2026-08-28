@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Alt Text Pipeline — Step 0: Create Grounding Examples
+Alt Text Pipeline — Step 0: Create Calibration Examples
 
 Processes a small sample of images without any prior examples,
 creating a baseline the archivist can review and correct.
@@ -8,19 +8,19 @@ Those corrected examples then guide the full image analysis run,
 and the AI will derive a style guide from the archivist's edits.
 
 Workflow:
-  1. python step-0-grounding.py                            # process N sample images (set in config)
+  1. python step-0-calibration.py                            # process N sample images (set in config)
   2. python step-2-html-review.py                          # open in browser, edit alt text
   3. [in browser] Export Decisions → move JSON to review/exports/
-  4. python step-0-grounding.py --export                   # write collection-examples.txt
-  4b. python step-0-grounding.py --test                   # verify style guide on fresh images
+  4. python step-0-calibration.py --export                   # write collection-examples.txt
+  4b. python step-0-calibration.py --test                   # verify style guide on fresh images
   5. python run.py                                         # full run with style-guided examples
 
 Usage:
-    python step-0-grounding.py
-    python step-0-grounding.py --folder images/my-collection
-    python step-0-grounding.py --export          # integrate reviewed decisions → collection-examples.txt
-    python step-0-grounding.py --export --folder output_folders/AltText_...
-    python step-0-grounding.py --test                     # test on new images with collection-examples.txt
+    python step-0-calibration.py
+    python step-0-calibration.py --folder images/my-collection
+    python step-0-calibration.py --export          # integrate reviewed decisions → collection-examples.txt
+    python step-0-calibration.py --export --folder output_folders/AltText_...
+    python step-0-calibration.py --test                     # test on new images with collection-examples.txt
 """
 
 import os
@@ -40,18 +40,19 @@ for lib in ("anthropic", "openai", "google", "urllib3", "httpx", "portkey_ai"):
     logging.getLogger(lib).setLevel(logging.WARNING)
 
 from config import (
-    get_step1_config, STEP1_PROMPT, GROUNDING_COUNT, GROUNDING_TEST_COUNT,
-    GROUNDING_TEST_SKIP_GROUNDING, RUN_HTML_REVIEW, RELATIONSHIP_BETWEEN_IMAGES_PER_CALL,
+    get_step1_config, STEP1_PROMPT, CALIBRATION_COUNT, CALIBRATION_TEST_COUNT,
+    CALIBRATION_TEST_SKIP_CALIBRATION, RUN_HTML_REVIEW, RELATIONSHIP_BETWEEN_IMAGES_PER_CALL,
 )
 from pipeline_core import (
     load_collection_context, collect_all_images, init_client, process_image_list,
     read_examples_file, format_examples_for_prompt, generate_style_analysis, load_style_guide,
+    portkey_active,
 )
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Process a sample of images to create grounding examples for a collection.'
+        description='Process a sample of images to create calibration examples for a collection.'
     )
     parser.add_argument('--folder', '-f', default=None,
         help='Image folder path (default: IMAGE_FOLDER from config.py). '
@@ -65,7 +66,7 @@ def main():
     args = parser.parse_args()
 
     # -------------------------------------------------------------------------
-    # EXPORT-GROUNDING MODE — integrate reviewer edits → collection-examples.txt
+    # EXPORT-CALIBRATION MODE — integrate reviewer edits → collection-examples.txt
     # -------------------------------------------------------------------------
     if args.export:
         from integrate_edits import (
@@ -105,14 +106,14 @@ def main():
             print(f"Selected: {os.path.basename(decisions_path)}")
 
         integrator = AltTextEditsIntegrator(folder_path)
-        success = integrator.run(decisions_path=decisions_path, export_grounding=True)
+        success = integrator.run(decisions_path=decisions_path, export_calibration=True)
 
         if success:
             print(f"\n{'='*60}")
             print(f"NEXT STEPS")
             print(f"{'='*60}")
             print(f"  Verify the style guide on fresh images:")
-            print(f"    python step-0-grounding.py --test")
+            print(f"    python step-0-calibration.py --test")
             print(f"{'='*60}")
 
         return 0 if success else 1
@@ -121,7 +122,7 @@ def main():
     provider = cfg['provider']
     model_name = cfg['model']
     input_folder_name = args.folder or cfg['image_folder']
-    use_portkey = cfg.get('use_portkey', False)
+    use_portkey = portkey_active(provider, cfg.get('use_portkey', False))
     images_per_call = cfg.get('images_per_call', 1)
 
     input_folder = os.path.join(script_dir, input_folder_name)
@@ -145,8 +146,8 @@ def main():
         examples = read_examples_file(input_folder)
         if not examples:
             print(f"\nNo collection-examples.txt found in {input_folder_name}")
-            print(f"Run the grounding workflow first:")
-            print(f"  python integrate_edits.py --folder <grounding_output> --export")
+            print(f"Run the calibration workflow first:")
+            print(f"  python integrate_edits.py --folder <calibration_output> --export")
             return 1
 
         style_analysis = load_style_guide(input_folder)
@@ -162,26 +163,26 @@ def main():
             collection_examples=collection_examples,
         )
 
-        grounding_count = GROUNDING_COUNT
-        skip = grounding_count if GROUNDING_TEST_SKIP_GROUNDING else 0
-        test_count = GROUNDING_TEST_COUNT
+        calibration_count = CALIBRATION_COUNT
+        skip = calibration_count if CALIBRATION_TEST_SKIP_CALIBRATION else 0
+        test_count = CALIBRATION_TEST_COUNT
         test_images = all_images[skip : skip + test_count]
         actual_count = len(test_images)
 
         if actual_count == 0:
-            print(f"\nNo test images available after skipping {skip} grounding image(s).")
-            print(f"Add more images to {input_folder_name} or set GROUNDING_TEST_SKIP_GROUNDING = False.")
+            print(f"\nNo test images available after skipping {skip} calibration image(s).")
+            print(f"Add more images to {input_folder_name} or set CALIBRATION_TEST_SKIP_CALIBRATION = False.")
             return 1
 
-        print(f"\nGROUNDING TEST — Step 0: Style Guide Verification")
+        print(f"\nCALIBRATION TEST — Step 0: Style Guide Verification")
         print(f"Provider : {provider.upper()}" + (" (via Portkey)" if use_portkey else ""))
         print(f"Model    : {model_name}")
         print(f"Folder   : {input_folder_name}")
-        print(f"Examples : {len(examples)} grounding example(s) loaded")
+        print(f"Examples : {len(examples)} calibration example(s) loaded")
         if style_analysis:
             print(f"Guide    : style guide loaded")
-        if GROUNDING_TEST_SKIP_GROUNDING:
-            print(f"Images   : {actual_count} image(s) (skipping first {skip} used for grounding)")
+        if CALIBRATION_TEST_SKIP_CALIBRATION:
+            print(f"Images   : {actual_count} image(s) (skipping first {skip} used for calibration)")
         else:
             print(f"Images   : first {actual_count} image(s)")
         if collection_context:
@@ -190,7 +191,7 @@ def main():
 
         timestamp = datetime.now().strftime("%Y-%m-%d_Time_%H-%M-%S")
         folder_slug = input_folder_name.replace(os.sep, "-").replace("/", "-")
-        output_folder_name = f"AltText_{folder_slug}_grounding_test_{model_name}_{timestamp}"
+        output_folder_name = f"AltText_{folder_slug}_calibration_test_{model_name}_{timestamp}"
         output_dir = os.path.join(script_dir, "output_folders", output_folder_name)
         os.makedirs(os.path.join(output_dir, "metadata", "json"), exist_ok=True)
 
@@ -206,8 +207,8 @@ def main():
             "model": model_name,
             "use_portkey": use_portkey,
             "image_folder": input_folder_name,
-            "grounding_test_run": True,
-            "grounding_examples_used": len(examples),
+            "calibration_test_run": True,
+            "calibration_examples_used": len(examples),
             "total_images": actual_count,
             "successful": actual_count - len(issues),
             "failed": len(issues),
@@ -226,7 +227,7 @@ def main():
         with open(json_path, 'w', encoding='utf-8') as f:
             json.dump(output, f, indent=2, ensure_ascii=False)
 
-        print(f"\nGROUNDING TEST COMPLETE")
+        print(f"\nCALIBRATION TEST COMPLETE")
         print(f"Processed : {actual_count - len(issues)}/{actual_count} images")
         if issues:
             print(f"Failed    : {len(issues)}")
@@ -258,7 +259,7 @@ def main():
         print(f"\n  2. If the outputs need refinement, edit the examples file directly:")
         print(f"       {input_folder_name}/collection-examples.txt")
         print(f"     Adjust the examples or the style guide, then re-run the test:")
-        print(f"       python step-0-grounding.py --test")
+        print(f"       python step-0-calibration.py --test")
         print(f"\n  3. When satisfied, run the full image analysis:")
         print(f"       python run.py")
         print(f"{'='*60}")
@@ -266,13 +267,13 @@ def main():
         return 0 if not issues else 1
 
     # -------------------------------------------------------------------------
-    # GROUNDING MODE — create baseline examples (no prior examples)
+    # CALIBRATION MODE — create baseline examples (no prior examples)
     # -------------------------------------------------------------------------
-    count = GROUNDING_COUNT
+    count = CALIBRATION_COUNT
     sample_images = all_images[:count]
     actual_count = len(sample_images)
 
-    print(f"\nGROUNDING — Step 0: Sample Image Analysis")
+    print(f"\nCALIBRATION — Step 0: Sample Image Analysis")
     print(f"Provider : {provider.upper()}" + (" (via Portkey)" if use_portkey else ""))
     print(f"Model    : {model_name}")
     print(f"Folder   : {input_folder_name}")
@@ -285,7 +286,7 @@ def main():
 
     timestamp = datetime.now().strftime("%Y-%m-%d_Time_%H-%M-%S")
     folder_slug = input_folder_name.replace(os.sep, "-").replace("/", "-")
-    output_folder_name = f"AltText_{folder_slug}_grounding_{model_name}_{timestamp}"
+    output_folder_name = f"AltText_{folder_slug}_calibration_{model_name}_{timestamp}"
     output_dir = os.path.join(script_dir, "output_folders", output_folder_name)
     os.makedirs(os.path.join(output_dir, "metadata", "json"), exist_ok=True)
 
@@ -301,7 +302,7 @@ def main():
         "model": model_name,
         "use_portkey": use_portkey,
         "image_folder": input_folder_name,
-        "grounding_run": True,
+        "calibration_run": True,
         "total_images": actual_count,
         "successful": actual_count - len(issues),
         "failed": len(issues),
@@ -318,7 +319,7 @@ def main():
     with open(json_path, 'w', encoding='utf-8') as f:
         json.dump(output, f, indent=2, ensure_ascii=False)
 
-    print(f"\nGROUNDING COMPLETE")
+    print(f"\nCALIBRATION COMPLETE")
     print(f"Processed : {actual_count - len(issues)}/{actual_count} images")
     if issues:
         print(f"Failed    : {len(issues)}")
@@ -350,12 +351,12 @@ def main():
         print(f"     then click 'Export Decisions' to download the decisions JSON.")
     print(f"\n  2. Move the exported JSON into:")
     print(f"       output_folders/{output_folder_name}/review/exports/")
-    print(f"\n  3. Create the grounding examples and style guide text file:")
+    print(f"\n  3. Create the calibration examples and style guide text file:")
     print(f"       python integrate_edits.py --folder output_folders/{output_folder_name} --export")
     print(f"     This writes collection-examples.txt to: {input_folder_name}/")
     print(f"\n  4. To verify the style guide on fresh images, run:")
-    print(f"       python step-0-grounding.py --test")
-    print(f"\n  5. Edit the style guide and grounding examples, re-running the test mode to verify until satisfied with the result.")
+    print(f"       python step-0-calibration.py --test")
+    print(f"\n  5. Edit the style guide and calibration examples, re-running the test mode to verify until satisfied with the result.")
     print(f"\n  6. To run the full image analysis:")
     print(f"       python run.py")
     print(f"\n  7. To edit the outputs of the full run:")

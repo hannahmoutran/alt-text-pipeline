@@ -4,10 +4,10 @@ Alt Text Pipeline — Step 1: Image Analysis
 
 Processes all images in a collection and generates alt text using Claude, OpenAI, or Gemini.
 
-If collection-examples.txt exists in the image folder (written by the grounding workflow),
+If collection-examples.txt exists in the image folder (written by the calibration workflow),
 the pipeline will:
   1. Analyze the archivist's corrections to generate a collection-specific style guide
-  2. Use that style guide and the grounding examples in the prompt for every image
+  2. Use that style guide and the calibration examples in the prompt for every image
 
 Usage (standalone):
     python step-1-image-analysis.py
@@ -26,7 +26,7 @@ from datetime import datetime
 script_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, script_dir)
 
-from config import get_step1_config, STEP1_PROMPT, SKIP_GROUNDING_IMAGES, RELATIONSHIP_BETWEEN_IMAGES_PER_CALL
+from config import get_step1_config, STEP1_PROMPT, SKIP_CALIBRATION_IMAGES, RELATIONSHIP_BETWEEN_IMAGES_PER_CALL
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 for lib in ("anthropic", "openai", "google", "urllib3", "httpx", "portkey_ai"):
@@ -35,7 +35,7 @@ for lib in ("anthropic", "openai", "google", "urllib3", "httpx", "portkey_ai"):
 from pipeline_core import (
     load_collection_context, collect_all_images, init_client, process_image_list,
     read_examples_file, format_examples_for_prompt, generate_style_analysis,
-    load_style_guide,
+    load_style_guide, portkey_active,
 )
 
 
@@ -45,6 +45,7 @@ def main():
     model_name: str = os.getenv('CONFIG_MODEL') or cfg['model']
     input_folder_name: str = os.getenv('CONFIG_IMAGE_FOLDER') or cfg['image_folder']
     use_portkey: bool = os.getenv('CONFIG_USE_PORTKEY', '').lower() == 'true' or cfg.get('use_portkey', False)
+    use_portkey = portkey_active(provider, use_portkey)
     images_per_call: int = int(os.getenv('CONFIG_IMAGES_PER_CALL') or cfg.get('images_per_call', 1))
 
     input_folder = os.path.join(script_dir, input_folder_name)
@@ -76,9 +77,9 @@ def main():
     style_analysis = load_style_guide(input_folder)
 
     if examples and not style_analysis:
-        # Fallback: generate inline if no pre-generated guide exists (e.g. grounding
+        # Fallback: generate inline if no pre-generated guide exists (e.g. calibration
         # workflow was skipped or run before this change was made).
-        print(f"\nFound {len(examples)} grounding example(s) — generating style analysis...")
+        print(f"\nFound {len(examples)} calibration example(s) — generating style analysis...")
         style_analysis = generate_style_analysis(examples, provider, client, model_name)
         if style_analysis:
             print(f"\n{style_analysis}\n")
@@ -87,7 +88,7 @@ def main():
     elif style_analysis:
         print(f"\nLoaded style guide from collection-examples.txt")
 
-    skip_count = SKIP_GROUNDING_IMAGES if SKIP_GROUNDING_IMAGES else 0
+    skip_count = SKIP_CALIBRATION_IMAGES if SKIP_CALIBRATION_IMAGES else 0
     images_to_process = all_images[skip_count:]
     skipped_count = skip_count
     if skipped_count:
@@ -134,7 +135,7 @@ def main():
     if issues:
         summary["issues"] = issues
     if examples:
-        summary["grounding_examples_used"] = len(examples)
+        summary["calibration_examples_used"] = len(examples)
     if style_analysis:
         summary["style_analysis"] = style_analysis
 

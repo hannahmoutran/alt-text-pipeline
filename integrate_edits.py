@@ -327,11 +327,11 @@ class AltTextEditsIntegrator:
             return None
 
     # -----------------------------------------------------------------------
-    # Grounding export
+    # Calibration export
     # -----------------------------------------------------------------------
 
-    def export_grounding(self):
-        """Write collection-examples.txt to the image folder for use as grounding examples."""
+    def export_calibration(self):
+        """Write collection-examples.txt to the image folder for use as calibration examples."""
         image_folder = self.summary.get('image_folder', '')
         if not image_folder:
             print("  Error: image_folder not found in summary — cannot write examples file.")
@@ -343,10 +343,11 @@ class AltTextEditsIntegrator:
             return False
 
         examples_path = os.path.join(target_folder, "collection-examples.txt")
+        reviewer_name = self.stats.get('reviewer_name') or 'an archivist'
         lines = [
             "# Collection Examples",
-            "# Reviewed and edited by an archivist.",
-            "# Original: AI-generated alt text  |  Alt Text: archivist's correction",
+            f"# Reviewed and edited by {reviewer_name}.",
+            "# Original: AI-generated alt text  |  Archivist Correction",
             "# The AI will analyze these differences to match the archivist's style.",
             "",
         ]
@@ -357,15 +358,17 @@ class AltTextEditsIntegrator:
                 continue
             original = rec.get('original_alt_text', alt_text)
             lines.append(f"Image: {rec['filename']}")
+            lines.append("")
             lines.append(f"Original: {original}")
-            lines.append(f"Alt Text: {alt_text}")
+            lines.append("")
+            lines.append(f"Archivist Correction: {alt_text}")
             lines.append("")
             exported += 1
 
         with open(examples_path, 'w', encoding='utf-8') as f:
             f.write('\n'.join(lines))
 
-        print(f"  Wrote {exported} grounding examples to: {examples_path}")
+        print(f"  Wrote {exported} calibration examples to: {examples_path}")
 
         # Generate a style guide from the corrected examples so the archivist
         # can review and edit it before running step 1.
@@ -415,7 +418,7 @@ class AltTextEditsIntegrator:
     # Run
     # -----------------------------------------------------------------------
 
-    def run(self, decisions_path=None, export_grounding=False):
+    def run(self, decisions_path=None, export_calibration=False):
         print("\n" + "=" * 60)
         print("Alt Text — Integrate Reviewer Edits")
         print("=" * 60)
@@ -455,9 +458,9 @@ class AltTextEditsIntegrator:
         print("\n6. Generating edit report...")
         self.generate_edit_report()
 
-        if export_grounding:
-            print("\n7. Exporting grounding examples...")
-            self.export_grounding()
+        if export_calibration:
+            print("\n7. Exporting calibration examples...")
+            self.export_calibration()
 
         self.print_summary()
 
@@ -482,7 +485,7 @@ def main():
     parser.add_argument('--folder', '-f', help='Path to AltText_ output folder.')
     parser.add_argument('--decisions', '-d', help='Path to specific decisions JSON file.')
     parser.add_argument('--yes', '-y', action='store_true', help='Skip confirmation prompt.')
-    parser.add_argument('--export-grounding', '-g', action='store_true',
+    parser.add_argument('--export-calibration', '-g', action='store_true',
         help='After integrating, write collection-examples.txt to the image folder for use in the full run.')
     args = parser.parse_args()
 
@@ -531,7 +534,7 @@ def main():
             return 0
 
     integrator = AltTextEditsIntegrator(folder_path)
-    success = integrator.run(decisions_path=decisions_path, export_grounding=args.export_grounding)
+    success = integrator.run(decisions_path=decisions_path, export_calibration=args.export_calibration)
     return 0 if success else 1
 
 

@@ -18,7 +18,7 @@ IMAGE_FOLDERS = None  # e.g., ["images/small", "images/medium", "images/large"]
 # MODEL CONFIGURATION
 # =============================================================================
 # Provider options: "claude", "openai", "gemini"
-STEP1_PROVIDER = "openai"
+STEP1_PROVIDER = "gemini"
 
 # Set a specific model, or None to use the provider's default
 STEP1_MODEL = None
@@ -92,36 +92,36 @@ RUN_HTML_REVIEW = True
 # =============================================================================
 # Number of images to send in a single API call (i.e. message).
 # Claude, OpenAI, and Gemini all support multiple images per call.
-IMAGES_PER_CALL = 2
+IMAGES_PER_CALL = 6
 
 # When IMAGES_PER_CALL > 1, this sentence is added to the prompt so the AI
 # knows how the images in each batch relate to one another.
 # Leave empty ("") if the images in a batch are unrelated.
 # Example: "These two images are front and back of the same sketch."
-RELATIONSHIP_BETWEEN_IMAGES_PER_CALL = "These two images are front and back of the same sketch."
+RELATIONSHIP_BETWEEN_IMAGES_PER_CALL = "These two images are from the same collection. They are in order, front and then back of each image one after the other."
 
 # =============================================================================
-# GROUNDING CONFIGURATION
+# CALIBRATION CONFIGURATION
 # =============================================================================
-# Number of images processed by step-0-grounding.py to create the grounding set.
+# Number of images processed by step-0-calibration.py to create the calibration set.
 # After review and editing, these become few-shot examples for the full run.
-GROUNDING_COUNT = 2
+CALIBRATION_COUNT = 2
 
-# Number of images used in grounding test mode (step-0-grounding.py --test).
-# Run this after grounding is complete and collection-examples.txt has been created
+# Number of images used in calibration test mode (step-0-calibration.py --test).
+# Run this after calibration is complete and collection-examples.txt has been created
 # to verify the style guide before a full run.
-GROUNDING_TEST_COUNT = 2
+CALIBRATION_TEST_COUNT = 2
 
-# When True, test mode skips the first GROUNDING_COUNT images (the ones already
+# When True, test mode skips the first CALIBRATION_COUNT images (the ones already
 # used to create the examples) and tests on fresh images from the collection.
-GROUNDING_TEST_SKIP_GROUNDING = True
+CALIBRATION_TEST_SKIP_CALIBRATION = True
 
 # Number of images to skip at the start of the full run (run.py).
 # Skipped images are not re-processed; those in collection-examples.txt carry
 # their archivist-reviewed alt text forward. Increase this count if you have
 # done test runs whose images you also want to exclude from the full run.
 # Set to 0 to re-process every image.
-SKIP_GROUNDING_IMAGES = 4
+SKIP_CALIBRATION_IMAGES = 0
 
 # =============================================================================
 # PORTKEY GATEWAY CONFIGURATION
@@ -188,11 +188,12 @@ def print_current_config():
     print(f"  Provider : {step1['provider'].upper()}")
     print(f"  Model    : {step1['model']}")
     print(f"  Batch    : {step1['images_per_call']} image(s) per call")
-    if step1["use_portkey"]:
+    from pipeline_core import portkey_active
+    if portkey_active(step1["provider"], step1["use_portkey"]):
         print(f"  Gateway  : Portkey")
     print(f"\nStep 2 — HTML Review : {'enabled' if RUN_HTML_REVIEW else 'disabled'}")
-    print(f"Grounding sample     : {GROUNDING_COUNT} images (run step-0-grounding.py)")
-    skip_label = f"skip first {SKIP_GROUNDING_IMAGES} image(s)" if SKIP_GROUNDING_IMAGES else "re-process all images"
+    print(f"Calibration sample     : {CALIBRATION_COUNT} images (run step-0-calibration.py)")
+    skip_label = f"skip first {SKIP_CALIBRATION_IMAGES} image(s)" if SKIP_CALIBRATION_IMAGES else "re-process all images"
     print(f"Full run             : {skip_label}")
     print("=" * 55 + "\n")
 
