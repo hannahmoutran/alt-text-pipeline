@@ -92,7 +92,7 @@ RUN_HTML_REVIEW = True
 # =============================================================================
 # Number of images to send in a single API call (i.e. message).
 # Claude, OpenAI, and Gemini all support multiple images per call.
-IMAGES_PER_CALL = 6
+IMAGES_PER_CALL = 2
 
 # When IMAGES_PER_CALL > 1, this sentence is added to the prompt so the AI
 # knows how the images in each batch relate to one another.
@@ -121,7 +121,7 @@ CALIBRATION_TEST_SKIP_CALIBRATION = True
 # their archivist-reviewed alt text forward. Increase this count if you have
 # done test runs whose images you also want to exclude from the full run.
 # Set to 0 to re-process every image.
-SKIP_CALIBRATION_IMAGES = 0
+SKIP_CALIBRATION_IMAGES = 2
 
 # =============================================================================
 # PORTKEY GATEWAY CONFIGURATION

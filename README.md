@@ -40,9 +40,11 @@ export OPENAI_API_KEY=...      # for OpenAI
 export GEMINI_API_KEY=...      # for Gemini
 ```
 
-### 3. Configure
+### 3. Add your images and configure
 
-Edit [config.py](config.py):
+Create a folder for your collection's images (e.g. `images/my-collection`) and put the image files in it. To guide the AI, you can also add a `collection-context.txt` file to that folder describing the collection — see [Collection context and examples](#collection-context-and-examples).
+
+Then edit [config.py](config.py):
 
 - `IMAGE_FOLDER` — path to your image folder (relative to project root)
 - `STEP1_PROVIDER` — `"claude"`, `"openai"`, or `"gemini"`
@@ -100,14 +102,16 @@ Set `SKIP_CALIBRATION_IMAGES = 0` to process every image in the folder.
 
 Place these optional files in your image folder to guide the AI:
 
-**`collection-context.txt`** — a brief description of the collection (provenance, date range, subject matter). Included in every prompt.
+**`collection-context.txt`** — a brief description of the collection (provenance, date range, subject matter). Included in every prompt. Add this yourself if you want the AI to have collection context.
 
 **`collection-examples.txt`** — few-shot examples showing original AI output alongside archivist corrections. Generated automatically by `step-0-calibration.py --export`, or written by hand. Format:
 
 ```
 Image: filename.jpg
+
 Original: AI-generated alt text here
-Alt Text: archivist's corrected version here
+
+Archivist Correction: archivist's corrected version here
 ```
 
 ---
