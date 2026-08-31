@@ -88,6 +88,15 @@ python step-0-calibration.py --test
 # Review the output, edit collection-examples.txt if needed, then re-test or run.py
 ```
 
+**Optional: regenerate the style guide after hand-editing the examples**
+
+```bash
+# Re-derives the style guide from the examples now in collection-examples.txt
+python step-0-calibration.py --restyle
+```
+
+Only the `# Style Guide` section is rewritten — the examples above it are left exactly as edited. Use this after correcting examples by hand; use a text editor if you only want to change the style guide wording itself.
+
 ---
 
 ## Calibration and the full run
@@ -104,7 +113,7 @@ Place these optional files in your image folder to guide the AI:
 
 **`collection-context.txt`** — a brief description of the collection (provenance, date range, subject matter). Included in every prompt. Add this yourself if you want the AI to have collection context.
 
-**`collection-examples.txt`** — few-shot examples showing original AI output alongside archivist corrections. Generated automatically by `step-0-calibration.py --export`, or written by hand. Format:
+**`collection-examples.txt`** — few-shot examples showing original AI output alongside archivist corrections, followed by an AI-derived style guide under a `# Style Guide` marker. Generated automatically by `step-0-calibration.py --export`, or written by hand. Both halves can be edited directly; `step-0-calibration.py --restyle` regenerates just the style guide from the current examples. Format:
 
 ```
 Image: filename.jpg

@@ -13,6 +13,7 @@ Workflow:
   3. [in browser] Export Decisions → move JSON to review/exports/
   4. python step-0-calibration.py --export                   # write collection-examples.txt
   4b. python step-0-calibration.py --test                   # verify style guide on fresh images
+  4c. python step-0-calibration.py --restyle                # after hand-editing examples, regenerate the style guide
   5. python run.py                                         # full run with style-guided examples
 
 Usage:
@@ -21,6 +22,7 @@ Usage:
     python step-0-calibration.py --export          # integrate reviewed decisions → collection-examples.txt
     python step-0-calibration.py --export --folder output_folders/AltText_...
     python step-0-calibration.py --test                     # test on new images with collection-examples.txt
+    python step-0-calibration.py --restyle                  # regenerate only the style guide after hand-editing examples
 """
 
 import os
@@ -46,7 +48,7 @@ from config import (
 from pipeline_core import (
     load_collection_context, collect_all_images, init_client, process_image_list,
     read_examples_file, format_examples_for_prompt, generate_style_analysis, load_style_guide,
-    portkey_active,
+    write_style_guide, portkey_active,
 )
 
 
@@ -61,6 +63,9 @@ def main():
         help='Test mode: run on fresh images using the existing collection-examples.txt to verify the style guide')
     parser.add_argument('--export', '-g', action='store_true',
         help='Integrate reviewer decisions and write collection-examples.txt to the image folder.')
+    parser.add_argument('--restyle', '-r', action='store_true',
+        help='Regenerate only the style guide from the examples currently in collection-examples.txt '
+             '(use after hand-editing the examples). Leaves the examples themselves untouched.')
     parser.add_argument('--decisions', '-d', default=None,
         help='Path to a specific decisions JSON file (used with --export).')
     args = parser.parse_args()
@@ -129,6 +134,49 @@ def main():
     if not os.path.exists(input_folder):
         print(f"Input folder not found: {input_folder}")
         return 1
+
+    # -------------------------------------------------------------------------
+    # RESTYLE MODE — regenerate only the style guide from the current examples
+    # -------------------------------------------------------------------------
+    if args.restyle:
+        examples = read_examples_file(input_folder)
+        if not examples:
+            print(f"\nNo examples found in {input_folder_name}/collection-examples.txt")
+            print(f"Run the calibration workflow first:")
+            print(f"  python step-0-calibration.py --export")
+            return 1
+
+        previous = load_style_guide(input_folder)
+
+        print(f"\nRESTYLE — regenerating the style guide only")
+        print(f"Provider : {provider.upper()}" + (" (via Portkey)" if use_portkey else ""))
+        print(f"Model    : {model_name}")
+        print(f"Folder   : {input_folder_name}")
+        print(f"Examples : {len(examples)} example(s) read from collection-examples.txt")
+        if previous:
+            print(f"Guide    : existing style guide will be replaced")
+        print()
+
+        client = init_client(provider, use_portkey)
+        style_analysis = generate_style_analysis(examples, provider, client, model_name)
+        if not style_analysis:
+            print("Could not generate a style guide — collection-examples.txt left unchanged.")
+            return 1
+
+        if not write_style_guide(input_folder, style_analysis):
+            print("Could not write the style guide to collection-examples.txt.")
+            return 1
+
+        print(f"{style_analysis}\n")
+        print(f"Style guide written to: {input_folder_name}/collection-examples.txt")
+        print(f"  (examples above the '# Style Guide' marker were left untouched)")
+        print(f"\n{'='*60}")
+        print(f"NEXT STEPS")
+        print(f"{'='*60}")
+        print(f"  Verify the style guide on fresh images:")
+        print(f"    python step-0-calibration.py --test")
+        print(f"{'='*60}")
+        return 0
 
     collection_context = load_collection_context(input_folder)
     client = init_client(provider, use_portkey)

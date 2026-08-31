@@ -64,6 +64,32 @@ def load_style_guide(folder_path):
         return ""
 
 
+def write_style_guide(folder_path, style_guide):
+    """Write (or replace) the '# Style Guide' section of collection-examples.txt.
+
+    Everything above the marker — the calibration examples — is left untouched,
+    so a hand-edited examples file keeps its edits.
+    """
+    examples_file = os.path.join(folder_path, "collection-examples.txt")
+    if not os.path.isfile(examples_file):
+        logging.warning(f"No collection-examples.txt found in: {folder_path}")
+        return False
+    try:
+        with open(examples_file, 'r', encoding='utf-8') as f:
+            content = f.read()
+        marker = "# Style Guide"
+        idx = content.find(marker)
+        if idx != -1:
+            content = content[:idx]
+        content = content.rstrip('\n')
+        with open(examples_file, 'w', encoding='utf-8') as f:
+            f.write(f"{content}\n\n{marker}\n{style_guide.strip()}\n")
+        return True
+    except Exception as e:
+        logging.warning(f"Could not write style guide to collection-examples.txt: {e}")
+        return False
+
+
 def load_collection_context(folder_path):
     context_file = os.path.join(folder_path, "collection-context.txt")
     if not os.path.isfile(context_file):

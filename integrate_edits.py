@@ -374,7 +374,9 @@ class AltTextEditsIntegrator:
         # can review and edit it before running step 1.
         try:
             sys.path.insert(0, script_dir)
-            from pipeline_core import read_examples_file, generate_style_analysis, init_client
+            from pipeline_core import (
+                read_examples_file, generate_style_analysis, init_client, write_style_guide,
+            )
             provider = self.summary.get('provider', '')
             model = self.summary.get('model', '')
             use_portkey = self.summary.get('use_portkey', False)
@@ -382,11 +384,9 @@ class AltTextEditsIntegrator:
                 client = init_client(provider, use_portkey)
                 examples = read_examples_file(target_folder)
                 style_analysis = generate_style_analysis(examples, provider, client, model)
-                if style_analysis:
-                    with open(examples_path, 'a', encoding='utf-8') as f:
-                        f.write(f"\n# Style Guide\n{style_analysis}\n")
+                if style_analysis and write_style_guide(target_folder, style_analysis):
                     print(f"\n{style_analysis}")
-                    print(f"\n  Style guide appended to collection-examples.txt")
+                    print(f"\n  Style guide written to collection-examples.txt")
         except Exception as e:
             print(f"  Warning: could not generate style guide: {e}")
 

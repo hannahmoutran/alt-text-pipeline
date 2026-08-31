@@ -18,7 +18,7 @@ IMAGE_FOLDERS = None  # e.g., ["images/small", "images/medium", "images/large"]
 # MODEL CONFIGURATION
 # =============================================================================
 # Provider options: "claude", "openai", "gemini"
-STEP1_PROVIDER = "gemini"
+STEP1_PROVIDER = "claude"
 
 # Set a specific model, or None to use the provider's default
 STEP1_MODEL = None
@@ -121,7 +121,7 @@ CALIBRATION_TEST_SKIP_CALIBRATION = True
 # their archivist-reviewed alt text forward. Increase this count if you have
 # done test runs whose images you also want to exclude from the full run.
 # Set to 0 to re-process every image.
-SKIP_CALIBRATION_IMAGES = 2
+SKIP_CALIBRATION_IMAGES = 0
 
 # =============================================================================
 # PORTKEY GATEWAY CONFIGURATION
