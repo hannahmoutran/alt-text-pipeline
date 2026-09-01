@@ -2,6 +2,8 @@
 
 A three-step pipeline for generating AI-assisted alt text for archival image collections. Supports Claude, OpenAI, and Gemini. First and foremost, archivists can generate alt text quickly and relatively cheaply.  They can also edit those outputs in a custom HTML interface and quickly integrate their decisions back into output files while also preserving a record of edits made. In addition, archivists can choose to run the calibration step, which allows them to easily customize collection-specific examples and a style guide to be included in the image analysis prompt.
 
+ **Project status:** This is an experimental project shared in case it's useful to others. It is not actively maintained — updates are occasional and there's no guarantee of bug fixes, support, or compatibility with future model or API changes. Feel free to fork it.
+
 ## How it works
 
 **Step 0 — Calibration** (`step-0-calibration.py`)
